@@ -1,8 +1,15 @@
 
 # wrsOS
 Wide Range School Operating System
+
+
+## Function
+basically a project trying to unify everything into a card, be it an identity, a method of transaction, et cetera. This project is specifically purposed for usage inside of school
+
+
 ## Features
 
+- Id card
 - Payment with rfid
 - Presence with rfid
 
