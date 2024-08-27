@@ -24,6 +24,7 @@ class AssignedGpioPin{
 LiquidCrystal_I2C lcd1(0x26, 16, 2); //lcd1 16x4
 LiquidCrystal_I2C lcd2(0x27, 20, 4); //lcd2 20x4
 MFRC522 mfrc522(SS_PIN, RST_PIN); //rfid, only 1 instance at a time
+MFRC522::MIFARE_Key key;
 
 class DeviceFunctionMain{
     public:
@@ -71,12 +72,39 @@ class DeviceFunctionLCD : public DeviceFunctionMain{
 
 };
 
-class DeviceFunctionRfid : public DeviceFunctionMain{
+class DeviceFunctionRfid : public DeviceFunctionMain{ // this shit is fucked honestly
     public:
         DeviceFunctionRfid(String name, uint32_t deviceId) : DeviceFunctionMain(name, deviceId) {};
 
         void initDevice() {
             mfrc522.PCD_Init();
+            for (byte i = 0; i < 6; i++) {
+                key.keyByte[i] = 0xFF;
+            }
+        }
+        //incomplete
+        void getCardUid() {
+            if (!mfrc522.PICC_IsNewCardPresent()) {
+                return;
+            }
+            if (!mfrc522.PICC_ReadCardSerial()) {
+                return;
+            }
+        }
+
+        void readData() {
+            
+        }
+
+        void writeData() {
+            
+        }
+
+        void dumpByteArray(uint8_t *buffer, uint8_t bufferSize) {
+            for (byte i = 0; i < bufferSize; i++) {
+                Serial.print(buffer[i] < 0x10 ? " 0" : " ");
+                Serial.print(buffer[i], HEX);
+            }
         }
 
     private:
