@@ -1,0 +1,7 @@
+MIFARE UID AUTHENTICATION CHECK -- PLAN
+
+1. Scan the card then RFID get the uid of the card
+2. cross-check the UID of the card with the UID in the database
+3. if correct then continue fetching the rest of the data, if not then return
+
+this is harder than it sounds like probably

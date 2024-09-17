@@ -2,12 +2,13 @@
 #define SOURCE
 
 #include "include.h"
+#include "net-prerequisite.h"
 
 /*Bus IO*/
 #define SDA 3
 #define SCL 8
-#define RST_PIN 9
-#define SS_PIN 10
+#define RST_PIN 0 //9   the reset pin in rfid   
+#define SS_PIN 5 //10   the fuckin sda pin in rfid
 
 /*Standard IO*/
 //TCSP3200
@@ -100,6 +101,20 @@ class DeviceFunctionRfid : public DeviceFunctionMain{ // this shit is fucked hon
             
         }
 
+        void printHex(uint8_t *buffer, uint8_t bufferSize) {
+            for (byte i = 0; i < bufferSize; i++) {
+                Serial.print(buffer[i] < 0x10 ? " 0" : " ");
+                Serial.print(buffer[i], HEX);
+            }
+        }
+
+        void printDec(uint8_t *buffer, uint8_t bufferSize) {
+            for (byte i = 0; i < bufferSize; i++) {
+                Serial.print(' ');
+                Serial.print(buffer[i], DEC);
+            }
+        }
+
         void dumpByteArray(uint8_t *buffer, uint8_t bufferSize) {
             for (byte i = 0; i < bufferSize; i++) {
                 Serial.print(buffer[i] < 0x10 ? " 0" : " ");
@@ -172,6 +187,8 @@ class DeviceFunctionColorSensor : public DeviceFunctionMain{
             digitalWrite(S3, LOW);
 
             int clearFrequency = pulseIn(sensorOut, LOW);
+
+            return clearFrequency;
         }
 
     private:

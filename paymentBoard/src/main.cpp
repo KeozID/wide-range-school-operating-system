@@ -1,18 +1,22 @@
-#include <Arduino.h>
+#include "source.h"
 
-// put function declarations here:
-int myFunction(int, int);
+DeviceFunctionMain mainFunction("MAIN_FUNCTION", 0);
+DeviceFunctionRfid rfidFunction("RFID", 1);
+DeviceFunctionLCD lcdFunction("LCD", 2, 1);
+DeviceFunctionKeypad keypadFunction("KEYPAD", 3);
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+    mainFunction.initEssential(true);
+    rfidFunction.initDevice();
+    lcdFunction.bootLcd(lcd1);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
+	rfidFunction.getCardUid();
+    char SK = keypadFunction.getButtonChar(false);
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+    if (SK) {
+        Serial.print(SK);
+    }
+
 }
