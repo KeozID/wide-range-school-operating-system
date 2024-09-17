@@ -63,6 +63,21 @@ class DeviceFunctionMain{
             SPI.begin();
         }
 
+        void initWifi() {
+            WiFi.begin(SSID, PASSWORD);
+            Serial.println("Connecting");
+            while (WiFi.status() != WL_CONNECTED) {
+                delay(500);
+                Serial.print(".");
+            }
+            Serial.println("");
+            Serial.print("Connected to WiFi network with IP Address: ");
+            Serial.println(WiFi.localIP());
+
+            // timer is of importance, see the variables in 'net-prerequisite.h'
+
+        }
+
     private:
         String _name;
         uint32_t _deviceId;
@@ -109,7 +124,7 @@ class DeviceFunctionRfid : public DeviceFunctionMain{ // this shit is fucked hon
             }
         }
 
-        void getCardUid() {
+        void getCardUid() { // debug purpose
 
             if (!mfrc522.PICC_IsNewCardPresent()) {
                 return;
@@ -158,6 +173,20 @@ class DeviceFunctionRfid : public DeviceFunctionMain{ // this shit is fucked hon
                 mfrc522.PCD_StopCrypto1();
         }
 
+        void getCardAccess() {
+            if (!mfrc522.PICC_IsNewCardPresent()) {
+                return;
+            }
+            if (!mfrc522.PICC_ReadCardSerial()) {
+                return;
+            }
+
+            String uid = getUidHex(mfrc522.uid.uidByte, mfrc522.uid.size);
+            if (uid.substring(1) == "HEX UID HERE") {
+                
+            }
+        }
+
         void readData() {
             
         }
@@ -180,11 +209,24 @@ class DeviceFunctionRfid : public DeviceFunctionMain{ // this shit is fucked hon
             }
         }
 
-        void dumpByteArray(uint8_t *buffer, uint8_t bufferSize) {
+        String getUidHex(uint8_t *buffer, uint8_t bufferSize) {
+            String content = "";
             for (byte i = 0; i < bufferSize; i++) {
-                Serial.print(buffer[i] < 0x10 ? " 0" : " ");
-                Serial.print(buffer[i], HEX);
+                content.concat(String(buffer[i] < 0x10 ? " 0" : " "));
+                content.concat(String(buffer[i], HEX));
             }
+            content.toUpperCase();
+            return content;
+        }
+
+        String getUidDec(uint8_t *buffer, uint8_t bufferSize) {
+            String content = "";
+            for (byte i = 0; i < bufferSize; i++) {
+                content.concat(String(buffer[i] < 0x10 ? " 0" : " "));
+                content.concat(String(buffer[i], DEC));
+            }
+            content.toUpperCase();
+            return content;
         }
 
     private:
