@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <ArduinoJson.h>
 
 //Libraries from ./lib
 #include <MFRC522.h>

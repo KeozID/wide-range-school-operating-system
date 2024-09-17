@@ -78,6 +78,54 @@ class DeviceFunctionMain{
 
         }
 
+        void postHttp() { // untested & editable
+            String url = serverName; // modify this
+            HTTPClient http;
+            String response;
+
+            StaticJsonDocument<200> buffer;
+            String jsonParams;
+
+            // below is example (editable) or make it return smth
+
+            buffer["uid"] = "3A 2B 7F 28";
+
+            serializeJson(buffer, jsonParams);
+            
+            http.begin(url);
+            int statusCode = http.POST(jsonParams);
+            response = http.getString();
+            Serial.println(response);
+            Serial.println(statusCode);
+        }
+
+        void getHttp() { // untested & editable
+            String url = serverName; // modify this
+            HTTPClient http;
+            String response;
+
+            http.begin(url);
+            http.GET();
+            
+            response = http.getString();
+            
+            StaticJsonDocument<1024> document;
+            deserializeJson(document, response);
+            JsonObject object = document.as<JsonObject>();
+
+            // below is example (editable) or make it returnable
+
+            String data = object[String("data")];
+            Serial.println(data);
+
+            StaticJsonDocument<1024> document1;
+            deserializeJson(document1, data);
+            JsonObject object1 = document1.as<JsonObject>();
+
+            String id = object1[String("id")];
+            Serial.println(id);
+        }
+
     private:
         String _name;
         uint32_t _deviceId;
