@@ -5,3 +5,8 @@ MIFARE UID AUTHENTICATION CHECK -- PLAN
 3. if correct then continue fetching the rest of the data, if not then return
 
 this is harder than it sounds like probably
+
+ntp is not working, look at this back
+post timestamp(unixtime) for presence, this is connected to ntp
+complete the damn payment ui and shit
+keypad to assign for string, connected to ux

@@ -34,9 +34,7 @@ char hexaKeys[ROWS][COLS] = {
 uint8_t colPins[ROWS] = {40, 39, 38, 37}; // Pins used for the rows of the keypad
 uint8_t rowPins[COLS] = {1, 2, 42, 41}; // Pins used for the columns of the keypad
 
-class AssignedGpioPin{
-    public:
-};
+int8_t buzzerPin = 45;
 
 Keypad keypad4x4 = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
 
@@ -46,6 +44,9 @@ LiquidCrystal_I2C lcd2(0x27, 20, 4); //lcd2 20x4
 MFRC522 mfrc522(SS_PIN, RST_PIN); //rfid, only 1 instance at a time
 MFRC522::MIFARE_Key key;
 uint8_t nuidPICC[4];
+
+WiFiUDP ntpUdp;
+NTPClient timeClient(ntpUdp, ntpServerName, ntpOffset, ntpInterval);
 
 class DeviceFunctionMain{
     public:
@@ -63,7 +64,7 @@ class DeviceFunctionMain{
             SPI.begin();
         }
 
-        void initWifi() {
+        void initWifi(bool ntpConnect) {
             WiFi.begin(SSID, PASSWORD);
             Serial.println("Connecting");
             while (WiFi.status() != WL_CONNECTED) {
@@ -74,12 +75,15 @@ class DeviceFunctionMain{
             Serial.print("Connected to WiFi network with IP Address: ");
             Serial.println(WiFi.localIP());
 
+            if (ntpConnect == true) {
+                timeClient.begin();
+            }
             // timer is of importance, see the variables in 'net-prerequisite.h'
 
         }
 
         void postHttp() { // untested & editable
-            String url = serverName; // modify this
+            String url = apiServerName; // modify this
             HTTPClient http;
             String response;
 
@@ -100,7 +104,7 @@ class DeviceFunctionMain{
         }
 
         void getHttp() { // untested & editable
-            String url = serverName; // modify this
+            String url = apiServerName; // modify this
             HTTPClient http;
             String response;
 
@@ -221,26 +225,224 @@ class DeviceFunctionRfid : public DeviceFunctionMain{ // this shit is fucked hon
                 mfrc522.PCD_StopCrypto1();
         }
 
-        void getCardAccess() {
+        /*
+        -type:
+            dec = return decimal value
+            hex = return hex value
+        */
+        String getCardUid(String type) {
+            String uid;
+
             if (!mfrc522.PICC_IsNewCardPresent()) {
-                return;
+                return String(); // returning str because it doesnt want to return nothing
             }
             if (!mfrc522.PICC_ReadCardSerial()) {
-                return;
+                return String();
             }
 
-            String uid = getUidHex(mfrc522.uid.uidByte, mfrc522.uid.size);
-            if (uid.substring(1) == "HEX UID HERE") {
-                
+            type.toUpperCase();
+
+            if (type == "DEC") {
+                uid = getUidDec(mfrc522.uid.uidByte, mfrc522.uid.size);
+            } else if (type == "HEX") {
+                uid = getUidHex(mfrc522.uid.uidByte, mfrc522.uid.size);
+            } else return "invalid type param";
+            return uid.substring(1); // this return the bare uid .substring(1)
+        }
+
+        String getCardUid(String type, bool loop) {
+            String uid;
+
+            while (loop == true) {
+                if(!mfrc522.PICC_IsNewCardPresent()) {
+                    continue;
+                }
+                if(!mfrc522.PICC_ReadCardSerial()) {
+                    continue;
+                }
+
+                type.toUpperCase();
+
+                if (type == "DEC") {
+                    uid = getUidDec(mfrc522.uid.uidByte, mfrc522.uid.size);
+                } else if (type == "HEX") {
+                    uid = getUidHex(mfrc522.uid.uidByte, mfrc522.uid.size);
+                } else return "invalid type param";
+
+                loop = false;
+                return uid.substring(1);
             }
         }
 
-        void readData() {
+        void getCardDatabaseInformation(String uid) {
+            String url = apiServerName + "/api/get-data";
+            HTTPClient http;
+            String response;
+
+            StaticJsonDocument<200> buffer;
+            String jsonParams;
+
+            buffer["uid"] = uid;
+
+            serializeJson(buffer, jsonParams);
             
+            http.begin(url);
+            http.addHeader("content-type", "application/json");
+            int statusCode = http.POST(jsonParams);
+            response = http.getString();
+            Serial.println(response);
+            Serial.println(statusCode);
+
+            StaticJsonDocument<1024> docData;
+            deserializeJson(docData, response);
+            JsonObject objData = docData.as<JsonObject>();
+
+            String data = docData[String("data")];
+
+            StaticJsonDocument<1024> document;
+            deserializeJson(document, data);
+            JsonObject object = document.as<JsonObject>();
+
+            String id = object[String("id")];
+            String name = object[String("name")];
+            bool superuser = object[String("superuser")];
+            String nis = object[String("nis")];
+            String email = object[String("email")];
+            int balance = object[String("balance")];
+
+            Serial.println(id);
+            Serial.println(name);
+            Serial.println(superuser);
+            Serial.println(nis);
+            Serial.println(email);
+            Serial.println(balance);
         }
 
-        void writeData() {
+        template <typename LCD>
+        void cardPayment(String uid, int price, LCD lcd) {
+            String url = apiServerName + "/api/pay-card";
+            HTTPClient http;
+            String response;
+
+            StaticJsonDocument<200> buffer;
+            String jsonParams;
+
+            buffer["uid"] = uid;
+            buffer["price"] = price;
+
+            serializeJson(buffer, jsonParams);
             
+            http.begin(url);
+            http.addHeader("content-type", "application/json");
+            int statusCode = http.POST(jsonParams);
+            response = http.getString();
+            Serial.println(response);
+            Serial.println(statusCode);
+
+            StaticJsonDocument<1024> docData;
+            deserializeJson(docData, response);
+            JsonObject objData = docData.as<JsonObject>();
+
+            String data = docData[String("data")];
+            String message = docData[String("message")];
+
+            StaticJsonDocument<1024> document;
+            deserializeJson(document, data);
+            JsonObject object = document.as<JsonObject>();
+
+            String balance = document[String("balance")];
+
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print(message);
+            lcd.setCursor(0, 1);
+            lcd.print("Balance:");
+            lcd.print(balance);
+        }
+
+        template <typename LCD>
+        void cardPresence(String uid, LCD lcd) {
+            String url = apiServerName + "/api/presence";
+            HTTPClient http;
+            String response;
+
+            StaticJsonDocument<200> buffer;
+            String jsonParams;
+
+            buffer["uid"] = uid;
+
+            serializeJson(buffer, jsonParams);
+            
+            http.begin(url);
+            http.addHeader("content-type", "application/json");
+            int statusCode = http.POST(jsonParams);
+            response = http.getString();
+            Serial.println(response);
+            Serial.println(statusCode);
+
+            StaticJsonDocument<1024> docData;
+            deserializeJson(docData, response);
+            JsonObject objData = docData.as<JsonObject>();
+
+            String data = docData[String("data")];
+
+            StaticJsonDocument<1024> document;
+            deserializeJson(document, data);
+            JsonObject object = document.as<JsonObject>();
+
+            String name = document[String("name")];
+            bool presence = document[String("presence")];
+
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print(name);
+            lcd.setCursor(0, 1);
+            if (presence == true) {
+                lcd.print("Logged in");
+            } else lcd.print("Logged out");
+
+        }
+
+        template <typename LCD>
+        void cardTopup(String uid, int value, LCD lcd) {
+            String url = apiServerName + "/api/topup-card";
+            HTTPClient http;
+            String response;
+
+            StaticJsonDocument<200> buffer;
+            String jsonParams;
+
+            buffer["uid"] = uid;
+            buffer["value"] = value;
+
+            serializeJson(buffer, jsonParams);
+            
+            http.begin(url);
+            http.addHeader("content-type", "application/json");
+            int statusCode = http.POST(jsonParams);
+            response = http.getString();
+            Serial.println(response);
+            Serial.println(statusCode);
+
+            StaticJsonDocument<1024> docData;
+            deserializeJson(docData, response);
+            JsonObject objData = docData.as<JsonObject>();
+
+            String data = docData[String("data")];
+            String message = docData[String("message")];
+
+            StaticJsonDocument<1024> document;
+            deserializeJson(document, data);
+            JsonObject object = document.as<JsonObject>();
+
+            String balance = document[String("balance")];
+
+            lcd.clear();
+            lcd.setCursor(0, 0);
+            lcd.print(message);
+            lcd.setCursor(0, 1);
+            lcd.print("Balance:");
+            lcd.print(balance);
         }
 
         void printHex(uint8_t *buffer, uint8_t bufferSize) {
@@ -356,7 +558,7 @@ class DeviceFunctionKeypad : public DeviceFunctionMain{
     public:
         DeviceFunctionKeypad(String name, uint32_t deviceId) : DeviceFunctionMain(name, deviceId) {};
 
-        char getButtonChar(bool isDirectPrint) {
+        char getButtonChar(bool isDirectPrint) { // the param names are stupid, basically if true, it means that you wont be able to create a variable assigned to this function
             char button = keypad4x4.getKey();
             
             if (isDirectPrint == true) {
@@ -366,6 +568,47 @@ class DeviceFunctionKeypad : public DeviceFunctionMain{
             } else return button;
         }
 
+        template <typename LCD>
+        String getButtonString(LCD lcd, bool paymentPrefix) {
+            String word = "";
+            lcd.backlight();
+
+            bool loop = true;
+            while (loop) {
+                char character = getButtonChar(false);
+                if (character) {
+                    if (character == 'A') {} // accept
+                    if (character == 'B') {}
+                    if (character == 'C') {word = "";} // cancel/clear
+                    if (character == 'D') {loop = false; return word;} // done
+                    if (character == '*') {}
+                    if (character == '#') {}
+                    word += character;
+                }
+
+                lcd.clear();
+                if (paymentPrefix == true) {lcd.print("Total:");}
+                lcd.print(word);
+                delay(50);
+            }
+        }
+
+    private:
+};
+
+class DeviceFunctionNtp : public DeviceFunctionMain{ // will look back on this later
+    public:
+        DeviceFunctionNtp(String name, uint32_t deviceId) : DeviceFunctionMain(name, deviceId) {};
+
+        int getNtpUnixtime() {
+            timeClient.update();
+            return timeClient.getEpochTime();
+        }
+
+        String getNtpFormattedTime() {
+            timeClient.update();
+            return timeClient.getFormattedTime();
+        }
     private:
 };
 
